@@ -6,9 +6,20 @@ A Forge 1.20.1 mod that optimizes performance issues in the Etheria mod using Mi
 
 This mod addresses significant performance bottlenecks in the Etheria mod that cause 20%+ main thread usage during block breaking operations. The optimizations are implemented using Mixins to patch the original mod without requiring source code modifications.
 
+## ⚠️ Current Status
+
+**Active Optimizations:**
+- ✅ ItemsLootModifier optimization (12-15% CPU reduction) - **ENABLED**
+
+**Disabled Optimizations:**
+- ⏸️ EtheriaCapability optimization (8-11% CPU reduction) - **TEMPORARILY DISABLED**
+  - Reason: Requires verification of actual Etheria class structure
+  - The mixin references methods that may not exist or have different signatures in the actual Etheria mod
+  - Will be re-enabled once tested against the real Etheria mod
+
 ## Performance Improvements
 
-### 1. ItemsLootModifier Optimization (~12-15% CPU reduction)
+### 1. ItemsLootModifier Optimization (~12-15% CPU reduction) ✅ ACTIVE
 **Target**: `it.mralxart.etheria.loot.ItemsLootModifier.doApply()`
 
 **Issues Fixed**:
@@ -19,15 +30,17 @@ This mod addresses significant performance bottlenecks in the Etheria mod that c
 
 **Implementation**: `ItemsLootModifierMixin.java`
 
-### 2. EtheriaCapability Serialization Optimization (~8-11% CPU reduction)
+### 2. EtheriaCapability Serialization Optimization (~8-11% CPU reduction) ⏸️ DISABLED
 **Target**: `it.mralxart.etheria.capability.EtheriaCapability`
 
-**Issues Fixed**:
+**Planned Fixes**:
 - **O(n²) Complexity**: Replaces `stream().noneMatch()` operations with `HashSet` lookups
   - `serializeStarsList()`: 8.41% CPU → <1% CPU (O(n²) → O(n))
   - `serializeSkillsList()`: 2.66% CPU → <0.5% CPU (O(n²) → O(n))
 
-**Implementation**: `EtheriaCapabilityMixin.java`
+**Status**: Code exists in `EtheriaCapabilityMixin.java` but is disabled in mixin configuration until actual Etheria mod structure can be verified.
+
+**Implementation**: `EtheriaCapabilityMixin.java` (disabled in mixins.etheriaperfix.json)
 
 ## Technical Details
 
