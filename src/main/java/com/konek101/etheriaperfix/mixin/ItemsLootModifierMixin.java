@@ -15,7 +15,7 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
+import it.mralxart.etheria.world.loot.ItemsLootModifier;
 /**
  * Mixin to optimize ItemsLootModifier.doApply() method
  * 
@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  * @author konek101
  */
 @Pseudo
-@Mixin(targets = "it.mralxart.etheria.loot.ItemsLootModifier", remap = false)
+@Mixin(value = ItemsLootModifier.class, remap = false)
 public class ItemsLootModifierMixin {
     
     // Cache for compiled regex patterns - thread-safe for multi-threaded loot generation

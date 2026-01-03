@@ -84,11 +84,14 @@ repositories {
         name = "ModMaven"
         url = "https://modmaven.dev"
     }
+    maven {
+        url "https://cursemaven.com"
+    }
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:1.20.1-47.2.0"
-
+    implementation fg.deobf("curse.maven:etheria-1100499:6927680")
     // Mixin annotation processor
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }

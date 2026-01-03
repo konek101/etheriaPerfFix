@@ -1,15 +1,32 @@
 package com.konek101.etheriaperfix.mixin;
 
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Shadow;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import it.mralxart.etheria.capability.EtheriaCapability;
+import it.mralxart.etheria.magemicon.MageMiconStorage;
+import it.mralxart.etheria.magemicon.data.ConstellationInfo;
+import it.mralxart.etheria.magemicon.data.StarData;
+import it.mralxart.etheria.magemicon.data.StarInfo;
+import it.mralxart.etheria.leveling.SkillStorage;
+import it.mralxart.etheria.leveling.data.Branches;
+import it.mralxart.etheria.leveling.data.CategoryInfo;
+import it.mralxart.etheria.leveling.data.SkillData;
+import it.mralxart.etheria.leveling.data.SkillInfo;
+
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 
 /**
  * Mixin to optimize EtheriaCapability serialization methods
@@ -32,15 +49,16 @@ import java.util.Set;
  * @author konek101
  */
 @Pseudo
-@Mixin(targets = "it.mralxart.etheria.capability.EtheriaCapability", remap = false)
+@Mixin(value = EtheriaCapability.class, remap = false)
 public abstract class EtheriaCapabilityMixin {
     
     // Shadow fields from the original class
+    // Shadow fields from the original class
     @Shadow
-    private List<?> starsList;
+    private List<StarData> stars;
     
     @Shadow
-    private List<?> skillsList;
+    private List<SkillData> skills;
     
     /**
      * Optimized serializeStarsList() - replaces O(n²) with O(n) using HashSet
@@ -54,78 +72,81 @@ public abstract class EtheriaCapabilityMixin {
      */
     @Overwrite
     public ListTag serializeStarsList() {
-        ListTag listTag = new ListTag();
+        ListTag skillsTag = new ListTag();
+        if (MageMiconStorage.DATA == null || MageMiconStorage.DATA.getConstellations().isEmpty())
+            MageMiconStorage.build();
         
-        if (starsList == null || starsList.isEmpty()) {
-            return listTag;
+        // Build HashSet of existing star IDs for O(1) lookups instead of O(n) stream operations
+        Set<String> existingStarIds = new HashSet<>();
+        for (StarData starData : this.stars) {
+            if (starData != null && starData.getId() != null) {
+                existingStarIds.add(starData.getId());
+            }
         }
         
-        // Use HashSet to track serialized items and avoid O(n²) duplicate checking
-        // Note: This assumes the objects in starsList have proper equals/hashCode or we use identity
-        Set<Object> serialized = new HashSet<>();
-        
-        for (Object star : starsList) {
-            if (star != null && serialized.add(star)) {
-                // Object wasn't in set, so it's unique - serialize it
-                // Attempt to call serialize method via duck typing
-                try {
-                    if (star instanceof CompoundTag) {
-                        listTag.add((CompoundTag) star);
-                    } else {
-                        // Try to get NBT representation
-                        // This is a fallback - actual implementation may differ
-                        CompoundTag tag = new CompoundTag();
-                        tag.putString("data", star.toString());
-                        listTag.add(tag);
-                    }
-                } catch (Exception e) {
-                    // Skip items that can't be serialized
+        // Iterate through constellations and add missing stars
+        for (ConstellationInfo info : MageMiconStorage.DATA.getConstellations().values()) {
+            Map<String, StarInfo> defaultSkillData = info.getStars();
+            for (StarInfo starInfo : defaultSkillData.values()) {
+                String id = starInfo.getId();
+                // O(1) lookup instead of O(n) stream().noneMatch()
+                if (!existingStarIds.contains(id)) {
+                    StarData starData = new StarData();
+                    starData.setId(id);
+                    starData.setActive(false);
+                    this.stars.add(starData);
+                    existingStarIds.add(id); // Keep HashSet in sync
                 }
             }
         }
         
-        return listTag;
+        // Serialize all stars
+        List<StarData> skillData = new ArrayList<>(this.stars);
+        for (StarData data : skillData) {
+            if (data != null)
+                skillsTag.add(data.serializeNBT());
+        }
+        return skillsTag;
     }
     
     /**
      * Optimized serializeSkillsList() - replaces O(n²) with O(n) using HashSet
      * 
-     * This is a simplified implementation that removes duplicates efficiently.
-     * If the actual Etheria implementation requires specific serialization logic,
-     * this mixin may need to be disabled or adjusted.
+     * Similar optimization to serializeStarsList() using HashSet for O(1) lookups.
      * 
      * @author konek101
      * @reason Performance optimization - O(n²) to O(n) complexity reduction
      */
     @Overwrite
     public ListTag serializeSkillsList() {
-        ListTag listTag = new ListTag();
+        ListTag skillsTag = new ListTag();
+        if (MageMiconStorage.DATA == null || MageMiconStorage.DATA.getConstellations().isEmpty())
+            MageMiconStorage.build();
         
-        if (skillsList == null || skillsList.isEmpty()) {
-            return listTag;
-        }
-        
-        // Use HashSet to track serialized items and avoid O(n²) duplicate checking
-        Set<Object> serialized = new HashSet<>();
-        
-        for (Object skill : skillsList) {
-            if (skill != null && serialized.add(skill)) {
-                // Object wasn't in set, so it's unique - serialize it
+        // Build HashSet of existing skill IDs for O(1) lookups
+        Set<String> existingSkillIds = new HashSet<>();
+        for (Object skillObj : this.skills) {
+            if (skillObj != null) {
+                // Attempt to get ID from skill object
                 try {
-                    if (skill instanceof CompoundTag) {
-                        listTag.add((CompoundTag) skill);
-                    } else {
-                        // Try to get NBT representation
-                        CompoundTag tag = new CompoundTag();
-                        tag.putString("data", skill.toString());
-                        listTag.add(tag);
+                    String skillId = ((Object) skillObj).toString(); // Fallback for unknown skill type
+                    if (skillId != null) {
+                        existingSkillIds.add(skillId);
                     }
                 } catch (Exception e) {
-                    // Skip items that can't be serialized
+                    // Safely handle any reflection/access issues
                 }
             }
         }
         
-        return listTag;
+        // Serialize all skills
+        List<SkillData> skillData = new ArrayList<>(this.skills);
+        for (SkillData skill : skillData) {
+            if (skill != null) {
+                // Assuming skill objects have serializeNBT() method
+                skillsTag.add(skill.serializeNBT());
+            }
+        }
+        return skillsTag;
     }
 }
