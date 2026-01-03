@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.konek101.etheriaperfix.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "etheriaperfix.refmap.json",
+  "mixins": [
+    "ItemsLootModifierMixin",
+    "EtheriaCapabilityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
